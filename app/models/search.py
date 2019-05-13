@@ -40,6 +40,7 @@ class BookChapter(db.Model):
     __tablename__ = 'book_chapter'
 
     id = Column(Integer, primary_key=True)                  # 主键
+    book_chapter_id = Column(BigInteger, unique=True)       # 小说章节id
     book_name_chapter = Column(String(200))                 # 小说章节名称
     book_chapter_content = Column(Text)                     # 小说章节内容
     book_chapter_is_free = Column(Integer)                  # 小说章节是否免费 (1:免费, 2:收费)

@@ -1,5 +1,4 @@
 # 工具类
-from app.models.account import Account
 import re
 import unittest
 from flask import request, abort, Flask, jsonify
@@ -113,12 +112,13 @@ class FlaskTestCase(unittest.TestCase):
 
     def tearDown(self):
         # 清除用户表, 便于测试
-        self.db.session().query(Account).delete()
-        self.db.session().commit()
-
-        self.db.session.remove()
-        self.db.engine.dispose()
-        self.app_context.pop()
+        pass
+        # self.db.session().query(Account).delete()
+        # self.db.session().commit()
+        #
+        # self.db.session.remove()
+        # self.db.engine.dispose()
+        # self.app_context.pop()
 
 
 def convert_error(func):

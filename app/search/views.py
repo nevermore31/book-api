@@ -3,10 +3,9 @@ from app.ext import db
 from app.tool import PaginationMixin, AbortMsg
 from flask import request
 from flask_restful import Resource
-import json
 
 
-class GetBook(PaginationMixin, AbortMsg, Resource):
+class BookInfoApi(PaginationMixin, AbortMsg, Resource):
 
     def get(self):
         """
@@ -28,10 +27,10 @@ class GetBook(PaginationMixin, AbortMsg, Resource):
         if book_status not in ['1', '2']:
             self.abort(400, {'msg': '状态码只能为1 或者2'})
 
-        # order_by 根据返回
-        comic_order_by = request.args.get('order_by', None)
-        if comic_order_by not in ['hot', 'time', 'col']:
-            self.abort(400, {'msg': '排序参数只能为<hot, time, col>'})
+        # # order_by 根据返回
+        # comic_order_by = request.args.get('order_by', None)
+        # if comic_order_by not in ['hot', 'time', 'col']:
+        #     self.abort(400, {'msg': '排序参数只能为<hot, time, col>'})
 
         # 定义排序
         query = db.session.query(BookInfo).order_by(BookInfo.id.desc())
@@ -77,65 +76,76 @@ class GetBook(PaginationMixin, AbortMsg, Resource):
         return {'data': results, 'paging': paging_data}
 
 
-class ComicInfoBody(PaginationMixin, AbortMsg, Resource):
+class BookVolumeApi(PaginationMixin, AbortMsg, Resource):
 
-    def get(self, comic_id):
+    def get(self, book_id):
         """
-        根据特定漫画id获取漫画所有信息或部分信息
-        :param comic_id: 漫画id
+        根据小说id获取漫画所有信息或部分信息
+        :param book_id: 小说id
         :return:
         """
-        # 限定是否传输图片地址, 默认为不传输
-        img_adr = request.args.get('img_adr', 'False')
+        # 根据章节id查找
         chapter_id = request.args.get('chapter_id', None)
 
-        query_data = db.session.query(ComicData).filter(ComicData.comic_name_id == comic_id).order_by(ComicData.id.desc())
-        if query_data.count() == 0:
-            return self.abort(400, {'msg': '无此漫画id, 请核对后在查询'})
-        query_name = db.session.query(ComicName).\
-            filter(ComicName.comic_id == comic_id)
+        query_info = db.session.query(BookInfo).filter(BookInfo.book_id == book_id).order_by(BookInfo.id.desc())
+        if query_info.count() == 0:
+            return self.abort(400, {'msg': '无此小说id, 请核对后在查询'})
+
+        query_volume = db.session.query(BookVolume).\
+            filter(BookVolume.book_info_id == book_id)
+
+        query_chapter = db.session.query(BookChapter).filter(BookChapter.book_info_id_chapter == book_id)
 
         if chapter_id:
-            query_data = query_data.filter(ComicData.chapter_id == chapter_id)
+            query_chapter = query_chapter.filter(BookChapter.book_chapter_id == chapter_id)
 
-        if query_data.count() == 0:
-            return self.abort(400, {'msg': '无此漫画章节id, 请获取所有漫画章节 http:/comic/<漫画id>'})
+            if query_chapter.count() == 0:
+                return self.abort(400, {'msg': '无此小说章节id, 请获取所有小说章节'})
+
+            book_volume_name = query_volume.filter(BookVolume.id == query_chapter.one().book_valume_id_chapter).\
+                one().book_volume_name
+
+            chapter_results = {
+                'book_name': query_info.one().book_name,
+                'book_author': query_info.one().book_author,
+                'book_name_chapter': query_chapter.one().book_name_chapter,
+                'book_chapter_is_free': query_chapter.one().book_chapter_is_free,
+                'book_chapter_content': query_chapter.one().book_chapter_content,
+                'book_chapter_id': query_chapter.one().book_chapter_id,
+                'book_volume_name': book_volume_name,
+            }
+
+            return {'data': chapter_results}
 
         results = {
-            'comic_id': query_name.one().comic_id,
-            'comic_name': query_name.one().comic_name,
-            'comic_author': query_name.one().comic_author,
-            'comic_desc': query_name.one().comic_desc,
-            'comic_local_collec': query_name.one().comic_local_collec,
-            'comic_chapter_details': []
+            'book_id': query_info.one().book_id,
+            'book_name': query_info.one().book_name,
+            'book_author': query_info.one().book_author,
+            'book_cover': query_info.one().book_cover,
+            'book_type': query_info.one().book_type,
+            'book_status': query_info.one().book_status,
+            'book_wordsnub': query_info.one().book_wordsnub,
+            'book_desc': query_info.one().book_desc,
+            'book_new_chapter': query_info.one().book_new_chapter,
+            'book_volume_chapter': []
         }
 
-        # 返回结果进行分页分页
-        data, paging_data = self.paginate_query(query_data)
-
-        for d in data:
-            if img_adr == 'False':
-                result = {
-                    'chapter_name': d.chapter_name,
-                    'chapter_id': d.chapter_id,
-                    'comic_cover': d.comic_cover,
-                    'comic_is_buy': d.comic_is_buy,
-                    'create_date': d.create_date,
+        for v in query_volume.all():
+            volume_data = {
+                'book_volume_is_free': v.book_volume_is_free,
+                'book_volume_name': v.book_volume_name,
+                'book_volume_in_chapternub': v.book_volume_in_chapternub,
+                'book_volume_wordnub': v.book_volume_wordnub,
+                'book_chapter_data': []
+            }
+            for c in query_chapter.all():
+                chapter_data = {
+                    'book_chapter_id': c.book_chapter_id,
+                    'book_name_chapter': c.book_name_chapter,
+                    'book_chapter_is_free': c.book_chapter_is_free,
                 }
-                results['comic_chapter_details'].append(result)
+                volume_data['book_chapter_data'].append(chapter_data)
 
-            elif img_adr == 'True':
-                result = {
-                    'chapter_name': d.chapter_name,
-                    'chapter_id': d.chapter_id,
-                    'comic_cover': d.comic_cover,
-                    'comic_is_buy': d.comic_is_buy,
-                    'create_date': d.create_date,
-                    'chapter_image_url': json.loads(d.chapter_image_url)
-                }
-                results['comic_chapter_details'].append(result)
+            results['book_volume_chapter'].append(volume_data)
 
-            else:
-                return self.abort(400, {'msg': '必须填入img_adr 参数<False> <True>, 默认为<False>,'
-                                               'False : 不返回漫画图片地址, True : 返回漫画图片地址'})
-        return {'data': results, 'paging': paging_data}
+        return {'data': results}

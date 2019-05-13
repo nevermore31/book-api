@@ -1,5 +1,4 @@
 '启动开发环境配置的服务器'
-
 from app import create_app
 from app.setting import Config
 
