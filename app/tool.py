@@ -76,6 +76,19 @@ class PaginationMixin:
         return query.order_by(None).count()
 
 
+class PaginationMax(PaginationMixin):
+    def get_per_page(self):
+        per_page = request.args.get('per_page', 100)
+        try:
+            if per_page is not None:
+                per_page = int(per_page)
+                if per_page < 1:
+                    raise ValueError
+        except ValueError:
+            abort(404, {'msg': "Invalid page size, page size must be an Positive integer"})
+        return per_page
+
+
 class FlaskTestCase(unittest.TestCase):
     '''
     使用方法：

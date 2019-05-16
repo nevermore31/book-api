@@ -1,8 +1,9 @@
 from app.models.search import BookInfo, BookVolume, BookChapter
 from app.ext import db
-from app.tool import PaginationMixin, AbortMsg
+from app.tool import PaginationMixin, AbortMsg, PaginationMax
 from flask import request
 from flask_restful import Resource
+
 
 
 class BookInfoApi(PaginationMixin, AbortMsg, Resource):
@@ -69,6 +70,7 @@ class BookInfoApi(PaginationMixin, AbortMsg, Resource):
                 'book_desc': d.book_desc,
                 'book_gender': d.book_gender,
                 'book_new_chapter': d.book_new_chapter,
+
             }
 
             results.append(result)
@@ -76,7 +78,7 @@ class BookInfoApi(PaginationMixin, AbortMsg, Resource):
         return {'data': results, 'paging': paging_data}
 
 
-class BookVolumeApi(PaginationMixin, AbortMsg, Resource):
+class BookVolumeApi(PaginationMax, AbortMsg, Resource):
 
     def get(self, book_id):
         """
@@ -130,22 +132,28 @@ class BookVolumeApi(PaginationMixin, AbortMsg, Resource):
             'book_volume_chapter': []
         }
 
-        for v in query_volume.all():
-            volume_data = {
+        # 返回结果进行分页分页
+        data, paging_data = self.paginate_query(query_chapter)
+        # 返回数据中看一共包含几个章节
+        result_volume = list(set([d.book_valume_id_chapter for d in data]))
+
+        volume_ = query_volume.filter(BookVolume.id.in_(result_volume)).all()
+        for v in volume_:
+            result = {
                 'book_volume_is_free': v.book_volume_is_free,
                 'book_volume_name': v.book_volume_name,
                 'book_volume_in_chapternub': v.book_volume_in_chapternub,
                 'book_volume_wordnub': v.book_volume_wordnub,
                 'book_chapter_data': []
             }
-            for c in query_chapter.all():
+
+        # 添加章节数据至目录
+            for d in data:
                 chapter_data = {
-                    'book_chapter_id': c.book_chapter_id,
-                    'book_name_chapter': c.book_name_chapter,
-                    'book_chapter_is_free': c.book_chapter_is_free,
+                    'book_chapter_id': d.book_chapter_id,
+                    'book_name_chapter': d.book_name_chapter,
+                    'book_chapter_is_free': d.book_chapter_is_free,
                 }
-                volume_data['book_chapter_data'].append(chapter_data)
-
-            results['book_volume_chapter'].append(volume_data)
-
-        return {'data': results}
+                result['book_chapter_data'].append(chapter_data)
+            results['book_volume_chapter'].append(result)
+        return {'data': results, 'paging': paging_data}
